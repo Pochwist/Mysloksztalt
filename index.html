@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Myślokształt</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #1a2332; /* Ciemnogranatowe tło */
+            overflow-x: hidden; /* pozioma blokada zostaje, pionowy scroll potrzebny gdy rozwinięte kategorie nie mieszczą się na ekranie */
+            overflow-y: auto;
+            font-family: 'Segoe UI', sans-serif;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        #canvas-tlo {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .ui {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* --- ANIMACJA TYTUŁU (eksplozja / rozbłysk przy znikaniu) --- */
+        .header-group {
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                        filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-origin: center center;
+            will-change: transform, opacity, filter;
+        }
+
+        .header-group.znika {
+            opacity: 0;
+            transform: scale(1.4);
+            filter: blur(14px) brightness(1.8);
+            pointer-events: none;
+        }
+
+        h1 {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 3em;
+            text-shadow: 0 0 40px rgba(102, 126, 234, 0.8);
+            margin-bottom: 0px;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.1em;
+            font-style: italic;
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-top: 5px;
+            margin-bottom: 30px;
+            animation: fadeIn 1.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-30px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- MENU --- */
+        .menu {
+            pointer-events: all;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* --- STYL PRZYCISKÓW (niebieskie matowe szkło) --- */
+        .btn {
+            display: block;
+            margin: 15px auto;
+            padding: 10px 30px;
+            background: rgba(102, 126, 234, 0.2);
+            border: 2px solid rgba(102, 126, 234, 0.8);
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            font-size: 16px;
+            font-family: inherit; /* przyciski-<button> (kategorie) nie dziedziczą fontu domyślnie */
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background: rgba(102, 126, 234, 0.4);
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(102, 126, 234, 0.6);
+        }
+
+        /* --- KATEGORIE (wrapper przejmuje odstęp 15px, żeby scalanie marginesów działało jak dawniej) --- */
+        .kategoria {
+            margin: 15px 0;
+        }
+
+        .btn-kategoria {
+            width: 100%; /* <button> nie wypełnia szerokości sam z siebie, w przeciwieństwie do <a> */
+            margin: 0;
+        }
+
+        /* --- SUBMENU KATEGORII (rozwijane przyciski, węższe i ciemniejsze niż główne) --- */
+        .podmenu {
+            display: grid;
+            grid-template-rows: 0fr; /* zwinięte - technika płynnej animacji "do auto" */
+            transition: grid-template-rows 0.4s ease;
+        }
+
+        .podmenu.otwarte {
+            grid-template-rows: 1fr;
+        }
+
+        .podmenu-wewn {
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .btn-pod {
+            width: 75%; /* ok. 25% węższe niż główne przyciski */
+            font-size: 14px;
+            padding: 8px 24px;
+            margin: 8px auto;
+            background: rgba(102, 126, 234, 0.12);
+            border-color: rgba(102, 126, 234, 0.55);
+        }
+
+        /* Panel kontaktowy */
+        .kontakt-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scaleX(0);
+            opacity: 0;
+            pointer-events: none;
+            transform-origin: center;
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                        opacity 0.6s ease;
+            width: min(90vw, 380px);
+        }
+
+        .kontakt-panel.active {
+            transform: translate(-50%, -50%) scaleX(1);
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* --- RAMKA ADRESOWA (ten sam styl "szkła" co przyciski) --- */
+        .kontakt-tresc {
+            padding: 30px 25px;
+            background: rgba(102, 126, 234, 0.2);
+            border: 2px solid rgba(102, 126, 234, 0.8);
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: rgba(255, 255, 255, 0.95);
+            transition: all 0.3s;
+        }
+
+        .kontakt-tresc:hover {
+            background: rgba(102, 126, 234, 0.35);
+            box-shadow: 0 0 30px rgba(102, 126, 234, 0.6);
+        }
+
+        .kontakt-linia {
+            margin: 8px 0;
+            font-size: 17px;
+            letter-spacing: 1px;
+        }
+
+        .kontakt-linia.name {
+            font-weight: 600;
+            font-size: 1.25em;
+            color: #ffffff;
+            text-shadow: 0 0 15px rgba(102, 126, 234, 0.8);
+        }
+
+        .kontakt-linia.email a {
+            color: #a0cdff;
+            text-decoration: none;
+            transition: color 0.3s, text-shadow 0.3s;
+        }
+
+        .kontakt-linia.email a:hover {
+            color: #ffffff;
+            text-shadow: 0 0 12px rgba(160, 205, 255, 0.9);
+        }
+
+        /* Przycisk powrotu - trójkąt w lewo */
+        .btn-powrot {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            margin-top: 20px;
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .btn-powrot:hover {
+            transform: scale(1.15) translateX(-3px);
+        }
+
+        .trojkat {
+            width: 0;
+            height: 0;
+            border-top: 9px solid transparent;
+            border-bottom: 9px solid transparent;
+            border-right: 15px solid rgba(255, 255, 255, 0.75);
+            filter: drop-shadow(0 0 6px rgba(102, 126, 234, 0.7));
+            transition: border-color 0.3s, filter 0.3s;
+        }
+
+        .btn-powrot:hover .trojkat {
+            border-right-color: #ffffff;
+            filter: drop-shadow(0 0 12px rgba(160, 205, 255, 0.9));
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas-tlo"></canvas>
+
+    <div class="ui">
+        <div class="header-group" id="header-group">
+            <h1>Myślokształt</h1>
+            <p class="subtitle">Zamysły nabierają kształtu</p>
+        </div>
+
+        <div class="menu" id="menu">
+            <div class="kategoria">
+                <button type="button" class="btn btn-glowny btn-kategoria" aria-expanded="false">Prawodawstwo Obywatelskie</button>
+                <div class="podmenu">
+                    <div class="podmenu-wewn">
+                        <a href="https://docs.google.com/document/d/1sShV4Xz0PtcuSZObO7xDm2ouOsKPWlk41eD9BJzzJ6c/edit?usp=drive_link" class="btn btn-pod">Podręcznik</a>
+                        <a href="https://docs.google.com/document/d/1XFi16xgW-UW5FJ04H90zvNrzY1i_MvX4hXeyEl1P3Cs/edit?usp=sharing" class="btn btn-pod">Okładka</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kategoria">
+                <button type="button" class="btn btn-glowny btn-kategoria" aria-expanded="false">Zdrowie</button>
+                <div class="podmenu">
+                    <div class="podmenu-wewn">
+                        <a href="https://docs.google.com/document/d/1CXFPJkrGh8RXkDVCNYNZZXbhe-Z2AqCMRT3yWI6F9WE/edit?usp=sharing" class="btn btn-pod">Poradnik</a>
+                        <a href="https://321my.wordpress.com/2018/07/01/sila-umyslu/" class="btn btn-pod">Moc uwagi</a>
+                        <a href="https://321my.wordpress.com/2018/11/08/post/" class="btn btn-pod">Post</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kategoria">
+                <button type="button" class="btn btn-glowny btn-kategoria" aria-expanded="false">Rozmaitości</button>
+                <div class="podmenu">
+                    <div class="podmenu-wewn">
+                        <a href="https://www.youtube.com/watch?v=SOhzvRxPdHs" class="btn btn-pod">Mapa osobowości</a>
+                        <a href="https://321my.wordpress.com/2018/06/02/gun-engine/" class="btn btn-pod">Gun-engine</a>
+                        <a href="https://321my.wordpress.com/2018/02/14/szczepionki/" class="btn btn-pod">Szczepionki</a>
+                    </div>
+                </div>
+            </div>
+
+            <a href="kontakt.html" class="btn btn-glowny" id="btn-kontakt">Kontakt</a>
+        </div>
+
+        <div class="kontakt-panel" id="kontakt-panel">
+            <div class="kontakt-tresc">
+                <p class="kontakt-linia name">Damian Jo</p>
+                <p class="kontakt-linia">33-100 Tarnów</p>
+                <p class="kontakt-linia email">
+                    <a href="mailto:poczta@mysloksztalt.cc">poczta@mysloksztalt.cc</a>
+                </p>
+                <button type="button" class="btn-powrot" id="btn-powrot" aria-label="Powrót do strony głównej">
+                    <span class="trojkat" aria-hidden="true"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas-tlo');
+        const ctx = canvas.getContext('2d');
+
+        const SPACING = 30;
+        const PROMIEŃ_SOCZEWKI = 75;
+
+        // Urządzenie bez realnego hovera (telefon/tablet) - lżejszy tryb renderowania
+        const jestDotykowy = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+        const MIN_ODSTEP_KLATEK = jestDotykowy ? 1000 / 30 : 0; // ~30 kl/s na dotykowych, bez limitu na desktopie
+
+        let cols, rows;
+        let siatka = [];
+        let mysz = { x: -1000, y: -1000 };
+
+        const znakiTylkoWidoczne = 'abcdefghijklmnopqrstuvwxyząćęłńóśźż0123456789!@#$%^&*()_+=-{}[]|:;<>.?/';
+        const znakiChaosu = znakiTylkoWidoczne + ' '.repeat(80);
+
+        const listaTriad = [
+            "PRAWDA DOBRO PIĘKNO",
+            "GWIAZDY KWIATY UŚMIECH DZIECKA",
+            "ANICCA DUKKHA ANATTĀ",
+            "DROGA PRAWDA ŻYCIE",
+            "MYŚLI SŁOWA CZYNY",
+            "ZAMIAR UWAGA PRZEJAWIENIE",
+            "OBSERWATOR PRZEDMIOT OBSERWACJA",
+            "ZAUWAŻENIE ODPUSZCZENIE OBECNOŚĆ"
+        ];
+
+        const ukryteWiadomosci = listaTriad.map(tekst => {
+            let prawda = tekst.toUpperCase();
+            let falsz = '';
+            for (let i = 0; i < prawda.length; i++) {
+                if (prawda[i] === ' ') {
+                    falsz += ' ';
+                } else {
+                    falsz += znakiTylkoWidoczne[Math.floor(Math.random() * znakiTylkoWidoczne.length)];
+                }
+            }
+            return { prawda, falsz };
+        });
+
+        // Czy prostokąt (z marginesem) wokół słowa jest wolny od innych triad?
+        function miejsceWolne(startY, startX, dlugosc, margines) {
+            for (let y = startY - margines; y <= startY + margines; y++) {
+                const rzad = siatka[y];
+                if (!rzad) continue;
+                for (let x = startX - margines; x <= startX + dlugosc - 1 + margines; x++) {
+                    if (rzad[x] && rzad[x].isTarget) return false;
+                }
+            }
+            return true;
+        }
+
+        // Losuje pozycję dla słowa, odrzucając kolizje z już wstawionymi triadami.
+        // Zwraca null, jeśli siatka jest za mała / nie udało się znaleźć miejsca.
+        function znajdzWolneMiejsce(dlugosc) {
+            const margines = 1;
+            const zakresX = cols - dlugosc - 2;
+            if (zakresX < 1 || rows - 2 < 1) return null;
+
+            const maxProby = 300;
+            for (let proba = 0; proba < maxProby; proba++) {
+                const startY = Math.floor(Math.random() * (rows - 2)) + 1;
+                const startX = Math.floor(Math.random() * zakresX) + 1;
+                if (miejsceWolne(startY, startX, dlugosc, margines)) {
+                    return { startY, startX };
+                }
+            }
+            return null;
+        }
+
+        function inicjujSiatke() {
+            canvas.width  = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            cols = Math.floor(canvas.width  / SPACING);
+            rows = Math.floor(canvas.height / SPACING);
+
+            siatka = [];
+
+            for (let y = 0; y < rows; y++) {
+                let rzad = [];
+                for (let x = 0; x < cols; x++) {
+                    rzad.push({
+                        char: znakiChaosu[Math.floor(Math.random() * znakiChaosu.length)],
+                        isTarget: false,
+                        targetChar: '',
+                        encodedChar: '',
+                        odkrytaPrzezFale: false
+                    });
+                }
+                siatka.push(rzad);
+            }
+
+            // Wstrzykujemy triady tak, by żadne dwie się nie stykały ani nie nachodziły
+            ukryteWiadomosci.forEach(msg => {
+                const miejsce = znajdzWolneMiejsce(msg.prawda.length);
+                if (!miejsce) return; // za mało miejsca - pomijamy tę triadę w tej inicjalizacji
+
+                const { startY, startX } = miejsce;
+                for (let i = 0; i < msg.prawda.length; i++) {
+                    if (siatka[startY] && siatka[startY][startX + i]) {
+                        siatka[startY][startX + i].isTarget    = true;
+                        siatka[startY][startX + i].targetChar  = msg.prawda[i];
+                        siatka[startY][startX + i].encodedChar = msg.falsz[i];
+                        siatka[startY][startX + i].char        = msg.falsz[i];
+                    }
+                }
+            });
+        }
+
+        window.addEventListener('resize', inicjujSiatke);
+        inicjujSiatke();
+
+        document.addEventListener('mousemove', (e) => {
+            mysz.x = e.clientX;
+            mysz.y = e.clientY;
+        });
+        document.addEventListener('mouseleave', () => {
+            mysz.x = -1000;
+            mysz.y = -1000;
+        });
+
+        setInterval(() => {
+            const rx = Math.floor(Math.random() * cols);
+            const ry = Math.floor(Math.random() * rows);
+            if (siatka[ry] && siatka[ry][rx] && !siatka[ry][rx].isTarget) {
+                siatka[ry][rx].char = znakiChaosu[Math.floor(Math.random() * znakiChaosu.length)];
+            }
+        }, jestDotykowy ? 90 : 50);
+
+        /* --- ROZWIJANE KATEGORIE MENU --- */
+
+        document.querySelectorAll('.btn-kategoria').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const podmenu = btn.nextElementSibling;
+                const otwarteTeraz = podmenu.classList.contains('otwarte');
+
+                // Tylko jedna kategoria otwarta naraz
+                document.querySelectorAll('.podmenu.otwarte').forEach(p => {
+                    p.classList.remove('otwarte');
+                    p.previousElementSibling.setAttribute('aria-expanded', 'false');
+                });
+
+                if (!otwarteTeraz) {
+                    podmenu.classList.add('otwarte');
+                    btn.setAttribute('aria-expanded', 'true');
+                }
+            });
+        });
+
+        // Przyciski-placeholdery (href="#") - do podmiany na docelowe adresy, na razie nic nie robią
+        document.querySelectorAll('.btn-pod[href="#"]').forEach(a => {
+            a.addEventListener('click', (e) => e.preventDefault());
+        });
+
+        /* ====================================================
+           MASZYNA STANÓW ANIMACJI KONTAKT
+           ==================================================== */
+
+        const KONTAKT_CONFIG = {
+            waveDuration:  2000,
+            pauseDuration:  700,
+            flashDuration:  900,
+            bandWidth:       70
+        };
+
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        // Na urządzeniach dotykowych fala i tak słabo widać, a spokojniejsza wersja jest lżejsza
+        const uproszczonaAnimacja = prefersReducedMotion || jestDotykowy;
+
+        const headerGroup  = document.getElementById('header-group');
+        const menuEl       = document.getElementById('menu');
+        const kontaktPanel = document.getElementById('kontakt-panel');
+        const btnKontakt   = document.getElementById('btn-kontakt');
+        const btnPowrot    = document.getElementById('btn-powrot');
+
+        const KONTAKT = {
+            phase: 'idle',
+            startTime: 0,
+            centerX: 0,
+            btnRects: []
+        };
+
+        function easeInOutCubic(t) {
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+
+        function startKontaktAnim() {
+            if (KONTAKT.phase !== 'idle') return;
+
+            // Zwijamy ewentualnie otwartą kategorię - fala operuje tylko na 4 głównych przyciskach
+            document.querySelectorAll('.podmenu.otwarte').forEach(p => {
+                p.classList.remove('otwarte');
+                p.previousElementSibling.setAttribute('aria-expanded', 'false');
+            });
+
+            KONTAKT.centerX = window.innerWidth / 2;
+            KONTAKT.btnRects = Array.from(menuEl.querySelectorAll('.btn-glowny')).map(el => {
+                const r = el.getBoundingClientRect();
+                el.style.transition    = uproszczonaAnimacja ? 'opacity 0.3s ease' : 'none';
+                el.style.pointerEvents = 'none';
+                return { el, halfWidth: r.width / 2 };
+            });
+
+            if (uproszczonaAnimacja) {
+                KONTAKT.btnRects.forEach(b => {
+                    b.el.style.opacity   = '0';
+                    b.el.style.transform = 'scaleX(0)';
+                });
+                headerGroup.classList.add('znika');
+                siatka.forEach(rzad => rzad.forEach(k => k.odkrytaPrzezFale = false));
+                kontaktPanel.classList.add('active');
+                KONTAKT.phase = 'panel';
+                return;
+            }
+
+            KONTAKT.phase     = 'waving';
+            KONTAKT.startTime = performance.now();
+        }
+
+        btnKontakt.addEventListener('click', (e) => {
+            e.preventDefault();
+            startKontaktAnim();
+        });
+
+        btnPowrot.addEventListener('click', () => {
+            if (KONTAKT.phase !== 'panel') return;
+
+            kontaktPanel.classList.remove('active');
+            headerGroup.classList.remove('znika');
+
+            const rects = KONTAKT.btnRects;
+            rects.forEach(b => {
+                b.el.style.transition    = 'transform 0.5s ease, opacity 0.5s ease';
+                b.el.style.transform     = 'scaleX(1)';
+                b.el.style.opacity       = '1';
+                b.el.style.pointerEvents = 'auto';
+            });
+
+            // Gdy przejście powrotne się skończy, zdejmujemy style inline całkowicie,
+            // żeby arkusz CSS (w tym .btn:hover) znów miał pełną kontrolę nad przyciskami.
+            setTimeout(() => {
+                rects.forEach(b => {
+                    b.el.style.transition    = '';
+                    b.el.style.transform     = '';
+                    b.el.style.opacity       = '';
+                    b.el.style.pointerEvents = '';
+                });
+            }, 520);
+
+            KONTAKT.phase = 'idle';
+        });
+
+        function tickKontakt(now) {
+            const stan = {
+                waveLeftX:  -99999,
+                waveRightX:  99999999,
+                showBand:    false,
+                bandWidth:   KONTAKT_CONFIG.bandWidth,
+                revealed:    false,
+                flashOpacity: 0,
+                mouseActive: true
+            };
+
+            if (KONTAKT.phase === 'idle' || KONTAKT.phase === 'panel') {
+                return stan;
+            }
+
+            const t = now - KONTAKT.startTime;
+
+            if (KONTAKT.phase === 'waving') {
+                const p  = Math.min(t / KONTAKT_CONFIG.waveDuration, 1);
+                const ep = easeInOutCubic(p);
+
+                stan.waveLeftX   = ep * KONTAKT.centerX;
+                stan.waveRightX  = window.innerWidth - ep * KONTAKT.centerX;
+                stan.showBand    = true;
+                stan.revealed    = true;
+                stan.mouseActive = false;
+
+                KONTAKT.btnRects.forEach(b => {
+                    const dist  = KONTAKT.centerX - stan.waveLeftX;
+                    const scale = dist <= b.halfWidth ? Math.max(dist / b.halfWidth, 0) : 1;
+                    b.el.style.transform = `scaleX(${scale})`;
+                    b.el.style.opacity   = String(scale);
+                });
+
+                if (p >= 1) {
+                    KONTAKT.phase     = 'pause';
+                    KONTAKT.startTime = now;
+                }
+
+            } else if (KONTAKT.phase === 'pause') {
+                stan.waveLeftX   = KONTAKT.centerX;
+                stan.waveRightX  = KONTAKT.centerX;
+                stan.revealed    = true;
+                stan.mouseActive = false;
+
+                if (t >= KONTAKT_CONFIG.pauseDuration) {
+                    KONTAKT.phase     = 'flash';
+                    KONTAKT.startTime = now;
+                    headerGroup.classList.add('znika');
+                }
+
+            } else if (KONTAKT.phase === 'flash') {
+                stan.waveLeftX   = KONTAKT.centerX;
+                stan.waveRightX  = KONTAKT.centerX;
+                stan.revealed    = true;
+                stan.mouseActive = false;
+
+                const p = Math.min(t / KONTAKT_CONFIG.flashDuration, 1);
+                stan.flashOpacity = Math.max(1 - p, 0);
+
+                if (p >= 1) {
+                    stan.revealed = false;
+                    KONTAKT.phase = 'panel';
+                    siatka.forEach(rzad => rzad.forEach(k => k.odkrytaPrzezFale = false));
+                    kontaktPanel.classList.add('active');
+                }
+            }
+
+            return stan;
+        }
+
+        let ostatniaKlatka = 0;
+
+        function animuj(znacznikCzasu) {
+            requestAnimationFrame(animuj);
+
+            if (znacznikCzasu - ostatniaKlatka < MIN_ODSTEP_KLATEK) {
+                return; // pomijamy tę klatkę - throttling na urządzeniach dotykowych
+            }
+            ostatniaKlatka = znacznikCzasu;
+
+            const kt = tickKontakt(znacznikCzasu);
+            const seedDekodowania = Math.floor(znacznikCzasu / 70); // raz na klatkę, nie raz na literę
+
+            ctx.fillStyle = '#1a2332';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.font         = '14px Courier New';
+            ctx.textAlign    = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const komorka = siatka[y][x];
+                    const posX = x * SPACING + SPACING / 2;
+                    const posY = y * SPACING + SPACING / 2;
+
+                    if (komorka.isTarget) {
+
+                        if (kt.showBand && (posX <= kt.waveLeftX || posX >= kt.waveRightX)) {
+                            komorka.odkrytaPrzezFale = true;
+                        }
+
+                        if (komorka.odkrytaPrzezFale && kt.flashOpacity > 0) {
+                            ctx.fillStyle   = `rgba(255,255,255,${kt.flashOpacity.toFixed(3)})`;
+                            ctx.shadowBlur  = 20 * kt.flashOpacity;
+                            ctx.shadowColor = 'rgba(100,200,255,1)';
+                            ctx.font        = 'bold 18px Courier New';
+                            ctx.fillText(komorka.targetChar, posX, posY);
+                            ctx.shadowBlur  = 0;
+                            ctx.font        = '14px Courier New';
+
+                        } else if (komorka.odkrytaPrzezFale && kt.revealed) {
+                            ctx.fillStyle   = 'rgba(100,200,255,0.95)';
+                            ctx.shadowBlur  = 10;
+                            ctx.shadowColor = 'rgba(100,200,255,0.5)';
+                            ctx.font        = 'bold 17px Courier New';
+                            ctx.fillText(komorka.targetChar, posX, posY);
+                            ctx.shadowBlur  = 0;
+                            ctx.font        = '14px Courier New';
+
+                        } else if (kt.showBand && Math.min(Math.abs(posX - kt.waveLeftX), Math.abs(posX - kt.waveRightX)) < kt.bandWidth) {
+                            const znak = znakiTylkoWidoczne[(x * 7 + y * 13 + seedDekodowania) % znakiTylkoWidoczne.length];
+                            ctx.fillStyle = 'rgba(170,210,255,0.55)';
+                            ctx.fillText(znak, posX, posY);
+
+                        } else {
+                            const dystans = kt.mouseActive ? Math.sqrt(Math.pow(mysz.x - posX, 2) + Math.pow(mysz.y - posY, 2)) : Infinity;
+
+                            if (dystans < PROMIEŃ_SOCZEWKI) {
+                                ctx.fillStyle   = 'rgba(100,200,255,0.95)';
+                                ctx.shadowBlur  = 12;
+                                ctx.shadowColor = 'rgba(100,200,255,0.6)';
+                                ctx.font        = 'bold 17px Courier New';
+                                ctx.fillText(komorka.targetChar, posX, posY);
+                                ctx.shadowBlur  = 0;
+                                ctx.font        = '14px Courier New';
+                            } else {
+                                ctx.fillStyle = 'rgba(200,220,255,0.08)';
+                                ctx.fillText(komorka.encodedChar, posX, posY);
+                            }
+                        }
+
+                    } else {
+                        if (kt.flashOpacity > 0) {
+                            ctx.fillStyle = `rgba(200,220,255,${(Math.random() * kt.flashOpacity * 0.5).toFixed(3)})`;
+                            ctx.fillText(komorka.char, posX, posY);
+
+                        } else if (kt.showBand) {
+                            const dist = Math.min(Math.abs(posX - kt.waveLeftX), Math.abs(posX - kt.waveRightX));
+                            if (dist < kt.bandWidth) {
+                                const f = 1 - dist / kt.bandWidth;
+                                ctx.fillStyle = `rgba(180,210,255,${(0.08 + f * 0.55).toFixed(3)})`;
+                                if (f > 0.55) {
+                                    ctx.shadowBlur  = 8 * f;
+                                    ctx.shadowColor = 'rgba(140,190,255,0.8)';
+                                }
+                                ctx.fillText(komorka.char, posX, posY);
+                                ctx.shadowBlur = 0;
+                            } else {
+                                ctx.fillStyle = 'rgba(200,220,255,0.08)';
+                                ctx.fillText(komorka.char, posX, posY);
+                            }
+
+                        } else {
+                            const dystans = kt.mouseActive ? Math.sqrt(Math.pow(mysz.x - posX, 2) + Math.pow(mysz.y - posY, 2)) : Infinity;
+
+                            ctx.fillStyle = dystans < PROMIEŃ_SOCZEWKI ? 'rgba(200,220,255,0.25)' : 'rgba(200,220,255,0.08)';
+                            ctx.fillText(komorka.char, posX, posY);
+                        }
+                    }
+                }
+            }
+        }
+
+        requestAnimationFrame(animuj);
+    </script>
+
+</body>
+</html>
