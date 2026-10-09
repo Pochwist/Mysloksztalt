@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Myślokształt</title>
-    
+
+    <!-- Statystyki odwiedzin (GoatCounter) -->
+    <script data-goatcounter="https://lubomir.goatcounter.com/count"
+            async src="//gc.zgo.at/count.js"></script>
+
     <style>
         * {
             margin: 0;
@@ -111,7 +115,7 @@
             box-shadow: 0 0 30px rgba(102, 126, 234, 0.6);
         }
 
-        /* --- KATEGORIE (wrapper przejmuje odstęp 15px, żeby scalanie marginesów działało jak dawniej) --- */
+        /* --- KATEGORIE (odstęp 15px jest na wrapperze, nie na przycisku: każda kategoria to przycisk plus jego rozwijane submenu, więc tylko odstęp na całym wrapperze daje równe przerwy między kategoriami) --- */
         .kategoria {
             margin: 15px 0;
         }
@@ -168,6 +172,7 @@
 
         /* --- RAMKA ADRESOWA (ten sam styl "szkła" co przyciski) --- */
         .kontakt-tresc {
+            position: relative; /* punkt odniesienia dla dyskretnego linku w rogu */
             padding: 30px 25px;
             background: rgba(102, 126, 234, 0.2);
             border: 2px solid rgba(102, 126, 234, 0.8);
@@ -205,6 +210,21 @@
         .kontakt-linia.email a:hover {
             color: #ffffff;
             text-shadow: 0 0 12px rgba(160, 205, 255, 0.9);
+        }
+
+        /* Dyskretny dostęp do panelu statystyk - bez stałego podświetlenia,
+           żeby nie rozpraszał osób, które po niego nie przyszły */
+        .licznik-link {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+        }
+
+        .licznik-link:hover {
+            background: rgba(255, 255, 255, 0.08);
         }
 
         /* Przycisk powrotu - trójkąt w lewo */
@@ -257,7 +277,7 @@
                 <button type="button" class="btn btn-glowny btn-kategoria" aria-expanded="false">Prawodawstwo Obywatelskie</button>
                 <div class="podmenu">
                     <div class="podmenu-wewn">
-                        <a href="https://docs.google.com/document/d/1sShV4Xz0PtcuSZObO7xDm2ouOsKPWlk41eD9BJzzJ6c/edit?usp=drive_link" class="btn btn-pod">Podręcznik</a>
+                        <a href="https://docs.google.com/document/d/e/2PACX-1vT2x9G1rNq2Je0-Gt1N2qNsorzIpgs18ZnzNBQir9UPIfWjVz9d6TNAlFlX_ab_m_8BYYPLGrkj-YZR/pub" class="btn btn-pod">Podręcznik</a>
                         <a href="https://docs.google.com/document/d/1XFi16xgW-UW5FJ04H90zvNrzY1i_MvX4hXeyEl1P3Cs/edit?usp=sharing" class="btn btn-pod">Okładka</a>
                     </div>
                 </div>
@@ -267,7 +287,7 @@
                 <button type="button" class="btn btn-glowny btn-kategoria" aria-expanded="false">Zdrowie</button>
                 <div class="podmenu">
                     <div class="podmenu-wewn">
-                        <a href="https://docs.google.com/document/d/1CXFPJkrGh8RXkDVCNYNZZXbhe-Z2AqCMRT3yWI6F9WE/edit?usp=sharing" class="btn btn-pod">Poradnik</a>
+                        <a href="https://docs.google.com/document/d/e/2PACX-1vSWP6cQFrY_J4OSAITvAz7lhZ8rY-UvLcmRvYy342rlyTpeB-wg_1Er9prQhrwYR-h5s7y89KwGWWQ3/pub" class="btn btn-pod">Poradnik</a>
                         <a href="https://321my.wordpress.com/2018/07/01/sila-umyslu/" class="btn btn-pod">Moc uwagi</a>
                         <a href="https://321my.wordpress.com/2018/11/08/post/" class="btn btn-pod">Post</a>
                     </div>
@@ -298,6 +318,7 @@
                 <button type="button" class="btn-powrot" id="btn-powrot" aria-label="Powrót do strony głównej">
                     <span class="trojkat" aria-hidden="true"></span>
                 </button>
+                <a href="licznik/" class="licznik-link" aria-label="Licznik odwiedzin"></a>
             </div>
         </div>
     </div>
@@ -452,11 +473,6 @@
                     btn.setAttribute('aria-expanded', 'true');
                 }
             });
-        });
-
-        // Przyciski-placeholdery (href="#") - do podmiany na docelowe adresy, na razie nic nie robią
-        document.querySelectorAll('.btn-pod[href="#"]').forEach(a => {
-            a.addEventListener('click', (e) => e.preventDefault());
         });
 
         /* ====================================================
